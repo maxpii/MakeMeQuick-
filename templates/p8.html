@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>800 Performance</title>
+</head>
+<body>
+
+<h1>800 Performance Optimization</h1>
+
+<div class="vertex" data-value="100" id="Sleep">
+    <p>Sleep: 100</p>
+
+    <button onclick="updateValue('Sleep', 10)">
+        +
+    </button>
+
+    <button onclick="updateValue('Sleep', -10)">
+        -
+    </button>
+</div>
+
+<div class="vertex" data-value="100" id="Nutrition">
+    <p>Nutrition: 100</p>
+
+    <button onclick="updateValue('Nutrition', 10)">
+        +
+    </button>
+
+    <button onclick="updateValue('Nutrition', -10)">
+        -
+    </button>
+</div>
+
+<div class="vertex" data-value="100" id="Consistency">
+    <p>Consistency: 100</p>
+
+    <button onclick="updateValue('Consistency', 10)">
+        +
+    </button>
+
+    <button onclick="updateValue('Consistency', -10)">
+        -
+    </button>
+</div>
+
+<div class="vertex" data-value="100" id="Strength Training">
+    <p>Strength Training: 100</p>
+    <button onclick="updateValue('Strength Training',10)">+</button>
+    <button onclick="updateValue('Strength Training',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="5K Pace Reps">
+    <p>5K Pace Reps: 100</p>
+    <button onclick="updateValue('5K Pace Reps',10)">+</button>
+    <button onclick="updateValue('5K Pace Reps',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Strides">
+    <p>Strides: 100</p>
+    <button onclick="updateValue('Strides',10)">+</button>
+    <button onclick="updateValue('Strides',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Threshold Intervals">
+    <p>Threshold Intervals: 100</p>
+    <button onclick="updateValue('Threshold Intervals',10)">+</button>
+    <button onclick="updateValue('Threshold Intervals',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Tempo Runs">
+    <p>Tempo Runs: 100</p>
+    <button onclick="updateValue('Tempo Runs',10)">+</button>
+    <button onclick="updateValue('Tempo Runs',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Zone 2 Running">
+    <p>Zone 2 Running: 100</p>
+    <button onclick="updateValue('Zone 2 Running',10)">+</button>
+    <button onclick="updateValue('Zone 2 Running',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="VO2 Max">
+    <p>VO2 Max: 100</p>
+    <button onclick="updateValue('VO2 Max',10)">+</button>
+    <button onclick="updateValue('VO2 Max',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Threshold">
+    <p>Lactate Threshold: 100</p>
+    <button onclick="updateValue('Threshold',10)">+</button>
+    <button onclick="updateValue('Threshold',-10)">-</button>
+</div>
+
+<div class="vertex" data-value="100" id="Running Economy">
+    <p>Running Economy: 100</p>
+    <button onclick="updateValue('Running Economy',10)">+</button>
+    <button onclick="updateValue('Running Economy',-10)">-</button>
+</div>
+
+<div data-value="100" id="800m">
+    <p>800: 100</p>
+</div>
+
+    <div id="djk-stuff">
+    <button onclick="showDJKData()">Show best path to improvement</button>
+    </div>
+    <br>
+
+    <div id="centrality-stuff">
+    <button onclick="showCentralityData()">Show centrality measures</button>
+    </div>
+    <br>
+
+    <div id="bfs-stuff">
+    <button onclick="showBFSData()">Show BFS stuff</button>
+    </div>
+    <br>
+
+</body>
+
+<script>
+
+
+let djkData = {{ djk|tojson }};
+let bfsData = {{ bfs|tojson }};
+let centralityData = {{ centrality|tojson }};
+
+console.log(djkData);
+console.log(bfsData);
+console.log(centralityData);
+
+function sendToPython() {
+
+    // going thorugh all the divs 
+     let allData = {};
+
+    document.querySelectorAll(".vertex").forEach(node => {
+        allData[node.id] = Number(node.dataset.value);
+    });
+
+    fetch("/p8", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(allData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        djkData = data.djk;
+        bfsData = data.bfs;
+        centralityData = data.centrality;
+    });
+}
+
+function updateValue(id, change)
+{
+    // some weird dataset stuff, but it works
+    let node = document.getElementById(id);
+    let currentValue = Number(node.dataset.value);
+    let newValue = currentValue + change;
+
+    newValue = Math.max(10, Math.min(100, newValue));
+    node.dataset.value = newValue;
+
+    let name = node.querySelector("p").textContent.split(":")[0]; // seperating name and data value
+    node.querySelector("p").textContent = name + ": " + newValue;
+
+    console.log(node.dataset.value);
+
+    sendToPython()
+}
+
+
+function showDJKData() {
+    var x = document.getElementById("djk-stuff")
+    var p = document.createElement("p")
+    p.textContent = JSON.stringify(djkData)
+
+    x.appendChild(p)
+}
+
+function showCentralityData() {
+    var x = document.getElementById("centrality-stuff")
+    var p = document.createElement("p")
+    p.textContent = JSON.stringify(centralityData)
+
+    x.appendChild(p)
+}
+function showBFSData() {
+    var x = document.getElementById("bfs-stuff")
+    var p = document.createElement("p")
+    p.textContent = JSON.stringify(bfsData)
+
+    x.appendChild(p)
+}
+</script>
+
+</html>

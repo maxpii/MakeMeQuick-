@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MakeMeQuick{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-brand">
+    <div class="nav-logo">M</div>
+    <span class="nav-title">MakeMeQuick</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/"        {% if request.path == '/'        %}class="active"{% endif %}>Dashboard</a></li>
+    <li><a href="/p8"      {% if request.path == '/p8'      %}class="active"{% endif %}>800m</a></li>
+    <li><a href="/p16"     {% if request.path == '/p16'     %}class="active"{% endif %}>1600m</a></li>
+    <li><a href="/p32"     {% if request.path == '/p32'     %}class="active"{% endif %}>3200m</a></li>
+    <!--<li><a href="/analyze" {% if request.path == '/analyze' %}class="active"{% endif %}>Analyze</a></li>-->
+  </ul>
+</nav>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <p>Powered by graph algorithms — <span class="accent">MakeMeQuick</span> &copy; 2025</p>
+</footer>
+
+</body>
+</html>

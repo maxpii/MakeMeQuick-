@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+{% block title %}{{ event_name }} — MakeMeQuick{% endblock %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header fade-up">
+  <p class="eyebrow">Performance Optimization</p>
+  <h1 class="text-green glow-g">{{ event_name }}</h1>
+  <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.5rem;">
+    <span class="badge badge-g">Live Graph</span>
+    <span class="badge badge-dim">Dijkstra · BFS · Centrality</span>
+  </div>
+  <p>Rate each training factor below. Lower values signal more room for improvement. Dijkstra routes through your weakest, highest-impact nodes.</p>
+</div>
+
+<!-- PERFORMANCE LAYOUT -->
+<div class="perf-layout">
+
+  <!-- ── LEFT: GRAPH + ALGORITHM TABS ── -->
+  <div class="perf-main">
+
+    <!-- INTERACTIVE GRAPH CANVAS -->
+    <div class="graph-wrap" style="margin-bottom:1.5rem;">
+      <canvas id="graphCanvas" height="520"></canvas>
+      <div class="graph-legend">
+        <span><span class="legend-dot" style="background:#ff6a00;"></span>Origin / Event</span>
+        <span><span class="legend-dot" style="background:#facc15;"></span>Foundations</span>
+        <span><span class="legend-dot" style="background:#888;"></span>Training Methods</span>
+        <span><span class="legend-dot" style="background:#44aaff;"></span>Physiology</span>
+        <span><span class="legend-dot" style="background:#39ff14;box-shadow:0 0 6px #39ff14;"></span>Optimal Path</span>
+      </div>
+    </div>
+
+    <!-- ALGORITHM RESULT TABS -->
+    <div class="tabs" id="resultTabs">
+      <button class="tab-btn active" onclick="switchTab('djk',this)">⚡ Optimal Path</button>
+      <button class="tab-btn"        onclick="switchTab('cent',this)">📊 Centrality</button>
+      <button class="tab-btn"        onclick="switchTab('bfs',this)">🌐 BFS Levels</button>
+    </div>
+
+    <!-- TAB: DIJKSTRA -->
+    <div class="tab-panel active" id="tab-djk">
+      <div id="djk-path-flow"></div>
+      <div id="djk-summary" style="margin-bottom:1rem;"></div>
+      <div id="djk-cards"></div>
+    </div>
+
+    <!-- TAB: CENTRALITY -->
+    <div class="tab-panel" id="tab-cent">
+      <p style="font-size:0.86rem;color:var(--muted);margin-bottom:1.25rem;">
+        Nodes ranked by <strong style="color:var(--white)">degree × strength</strong>. A high score means the factor is well-connected <em>and</em> currently performing well — it's load-bearing. A low score means it's either poorly connected or undertrained.
+      </p>
+      <div id="cent-chart"></div>
+    </div>
+
+    <!-- TAB: BFS -->
+    <div class="tab-panel" id="tab-bfs">
+      <p style="font-size:0.86rem;color:var(--muted);margin-bottom:1.25rem;">
+        The training graph explored layer by layer from Desire. Nodes appear in the order the BFS frontier reaches them.
+      </p>
+      <div id="bfs-display"></div>
+    </div>
+
+  </div><!-- /perf-main -->
+
+  <!-- ── RIGHT: VERTEX CONTROLS SIDEBAR ── -->
+  <div class="perf-sidebar">
+    <div class="card" style="margin-bottom:1rem;">
+      <h4 style="color:var(--green);margin-bottom:0.25rem;">Training Factors</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;">Rate each factor 10–100. Lower = more room to improve. Updates the graph live.</p>
+
+      <div class="layer-sep">Foundations</div>
+      <div id="ctrl-foundations" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;"></div>
+
+      <div class="layer-sep">Training Methods</div>
+      <div id="ctrl-training" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;"></div>
+
+      <div class="layer-sep">Physiology</div>
+      <div id="ctrl-physio" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+    </div>
+
+    <div class="card card-g" style="font-size:0.82rem;">
+      <h4 style="margin-bottom:0.4rem;">Reading the Graph</h4>
+      <p style="font-size:0.8rem;">The <span class="text-green">glowing green path</span> is your optimal improvement route. Each node on the path is weak AND highly connected to your event. Lower those values to see the path shift.</p>
+    </div>
+  </div>
+
+</div><!-- /perf-layout -->
+
+<!-- ── JAVASCRIPT ── -->
+<script>
+// ── DATA FROM SERVER ─────────────────────────────────────────
+let djkData        = {{ djk|tojson }};
+let bfsData        = {{ bfs|tojson }};
+let centralityData = {{ centrality|tojson }};
+
+const EVENT_NAME = "{{ event_name }}";
+const ROUTE      = "{{ route }}";
+
+// ── STATIC GRAPH DEFINITION ──────────────────────────────────
+
+const NODE_LAYERS = {
+  'Desire':              0,
+  'Sleep':               1,  'Nutrition':    1,  'Consistency':      1,
+  'Strength Training':   2,  '5K Pace Reps': 2,  'Strides':          2,
+  'Threshold Intervals': 2,  'Tempo Runs':   2,  'Zone 2 Running':   2,
+  'Threshold':           3,  'VO2 Max':      3,  'Running Economy':  3,
+  // event node added dynamically
+};
+
+const NODE_COLORS = {
+  0: '#ff6a00',   // origin
+  1: '#facc15',   // foundations
+  2: '#888888',   // training
+  3: '#44aaff',   // physiology
+  4: '#ff6a00',   // event
+};
+
+const DISPLAY_NAMES = {
+  'Threshold':           'Lactate Threshold',
+  '5K Pace Reps':        '5K Pace Reps',
+  'Strength Training':   'Strength',
+  'Threshold Intervals': 'Threshold Int.',
+  'Zone 2 Running':      'Zone 2',
+  'Running Economy':     'Economy',
+};
+
+// Canvas label (short enough to fit in a node)
+const CANVAS_LABELS = {
+  'Desire':              'Desire',
+  'Sleep':               'Sleep',
+  'Nutrition':           'Nutrition',
+  'Consistency':         'Consistency',
+  'Strength Training':   'Strength',
+  '5K Pace Reps':        '5K Reps',
+  'Strides':             'Strides',
+  'Threshold Intervals': 'Thresh. Int.',
+  'Tempo Runs':          'Tempo',
+  'Zone 2 Running':      'Zone 2',
+  'Threshold':           'L. Threshold',
+  'VO2 Max':             'VO2 Max',
+  'Running Economy':     'Economy',
+};
+
+// Edge weights match app.py exactly
+const BASE_EDGES = [
+  // Desire → Foundations
+  ['Desire','Sleep',100], ['Desire','Nutrition',100], ['Desire','Consistency',100],
+  // Sleep → Training
+  ['Sleep','Strength Training',100], ['Sleep','5K Pace Reps',100], ['Sleep','Strides',100],
+  ['Sleep','Threshold Intervals',100], ['Sleep','Tempo Runs',100], ['Sleep','Zone 2 Running',100],
+  // Nutrition → Training
+  ['Nutrition','Strength Training',100], ['Nutrition','5K Pace Reps',100], ['Nutrition','Strides',100],
+  ['Nutrition','Threshold Intervals',100], ['Nutrition','Tempo Runs',100], ['Nutrition','Zone 2 Running',100],
+  // Consistency → Training
+  ['Consistency','Strength Training',100], ['Consistency','5K Pace Reps',100], ['Consistency','Strides',100],
+  ['Consistency','Threshold Intervals',100], ['Consistency','Tempo Runs',100], ['Consistency','Zone 2 Running',100],
+  // Training → Physio
+  ['Strength Training','Threshold',75], ['Strength Training','VO2 Max',70],     ['Strength Training','Running Economy',20],
+  ['5K Pace Reps','Threshold',25],       ['5K Pace Reps','VO2 Max',5],          ['5K Pace Reps','Running Economy',40],
+  ['Strides','Threshold',95],            ['Strides','VO2 Max',90],              ['Strides','Running Economy',30],
+  ['Threshold Intervals','Threshold',10],['Threshold Intervals','VO2 Max',30],  ['Threshold Intervals','Running Economy',60],
+  ['Tempo Runs','Threshold',20],         ['Tempo Runs','VO2 Max',40],           ['Tempo Runs','Running Economy',70],
+  ['Zone 2 Running','Threshold',30],     ['Zone 2 Running','VO2 Max',20],       ['Zone 2 Running','Running Economy',50],
+];
+
+const EVENT_EDGE_MAP = {
+  '800m':  [['Threshold','800m',80],  ['VO2 Max','800m',70],  ['Running Economy','800m',50]],
+  '1600m': [['Threshold','1600m',70], ['VO2 Max','1600m',65], ['Running Economy','1600m',60]],
+  '3200m': [['Threshold','3200m',30], ['VO2 Max','3200m',40], ['Running Economy','3200m',70]],
+};
+
+const NODE_DESCRIPTIONS = {
+  'Desire':              'Your motivation to improve. The origin of every training pathway.',
+  'Sleep':               'Sleep drives recovery and hormonal adaptation. Without it, every other training stimulus is diminished.',
+  'Nutrition':           'Fuels training and repair. Poor nutrition creates a deficit that no training protocol can fully overcome.',
+  'Consistency':         'The compounding effect of regular training. More impactful than any single workout.',
+  'Strength Training':   'Builds muscle resilience, tendon strength, and neuromuscular efficiency — all of which reduce injury risk and improve economy.',
+  '5K Pace Reps':        'Running near VO2 max pace develops the aerobic ceiling and builds speed-specific adaptations.',
+  'Strides':             'Short accelerations sharpen neuromuscular coordination and running form without significant fatigue.',
+  'Threshold Intervals': 'The most direct stimulus for raising lactate threshold — the key pacing ceiling for any race.',
+  'Tempo Runs':          'Sustained aerobic effort that improves lactate clearance and mental race-pace comfort.',
+  'Zone 2 Running':      'Low-intensity base building that increases mitochondrial density and fat metabolism efficiency.',
+  'Threshold':           'Lactate threshold determines the pace you can sustain. The single most important factor in middle-distance racing.',
+  'VO2 Max':             'Maximum oxygen uptake. Sets the aerobic ceiling — the hard limit on how fast you can race.',
+  'Running Economy':     'Oxygen cost at a given pace. Better economy means more speed for the same effort.',
+};
+
+const LAYER_NAMES = ['Origin', 'Foundation', 'Training Method', 'Physiological Factor', 'Race Event'];
+
+// ── NODE CONTROLS ────────────────────────────────────────────
+
+const FOUNDATION_IDS = ['Sleep', 'Nutrition', 'Consistency'];
+const TRAINING_IDS   = ['Strength Training', '5K Pace Reps', 'Strides', 'Threshold Intervals', 'Tempo Runs', 'Zone 2 Running'];
+const PHYSIO_IDS     = ['Threshold', 'VO2 Max', 'Running Economy'];
+
+function buildControls() {
+  function makeCard(id) {
+    const displayName = DISPLAY_NAMES[id] || id;
+    const div = document.createElement('div');
+    div.className = 'vertex vc';
+    div.dataset.value = '100';
+    div.id = id;
+    div.innerHTML =
+      `<p style="display:none">${id}: 100</p>` +
+      `<div class="vc-header">` +
+        `<span class="vc-name">${displayName}</span>` +
+        `<span class="vc-val" id="vcv-${id.replace(/ /g,'_')}">100</span>` +
+      `</div>` +
+      `<div class="vc-bar-track"><div class="vc-bar" id="vcb-${id.replace(/ /g,'_')}" style="width:100%"></div></div>` +
+      `<div class="vc-btns">` +
+        `<button class="btn btn-icon" onclick="updateValue('${id}',-10)">−</button>` +
+        `<button class="btn btn-icon" onclick="updateValue('${id}',10)">+</button>` +
+      `</div>`;
+    return div;
+  }
+  FOUNDATION_IDS.forEach(id => document.getElementById('ctrl-foundations').appendChild(makeCard(id)));
+  TRAINING_IDS.forEach(id   => document.getElementById('ctrl-training').appendChild(makeCard(id)));
+  PHYSIO_IDS.forEach(id     => document.getElementById('ctrl-physio').appendChild(makeCard(id)));
+}
+
+function getStrength(name) {
+  const el = document.getElementById(name);
+  return el ? Number(el.dataset.value) : 100;
+}
+
+function updateValue(id, change) {
+  const node = document.getElementById(id);
+  if (!node) return;
+  const nv = Math.max(10, Math.min(100, Number(node.dataset.value) + change));
+  node.dataset.value = nv;
+
+  // Keep hidden <p> in sync (sendToPython reads dataset.value, not this, but keep it clean)
+  const p = node.querySelector('p');
+  if (p) p.textContent = id + ': ' + nv;
+
+  // Update visual controls
+  const safe = id.replace(/ /g, '_');
+  const valEl = document.getElementById('vcv-' + safe);
+  if (valEl) valEl.textContent = nv;
+  const barEl = document.getElementById('vcb-' + safe);
+  if (barEl) {
+    barEl.style.width = nv + '%';
+    barEl.style.background = nv <= 40 ? 'var(--orange)' : nv <= 70 ? '#facc15' : 'var(--green)';
+    barEl.style.boxShadow = nv <= 40 ? '0 0 6px rgba(255,106,0,0.5)' : '0 0 6px rgba(57,255,20,0.4)';
+  }
+
+  node.classList.toggle('modified', nv < 100);
+  sendToPython();
+  drawGraph();
+}
+
+function sendToPython() {
+  const payload = {};
+  document.querySelectorAll('.vertex').forEach(n => {
+    payload[n.id] = Number(n.dataset.value);
+  });
+
+  fetch(ROUTE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    djkData        = data.djk;
+    bfsData        = data.bfs;
+    centralityData = data.centrality;
+    renderDijkstra(djkData);
+    renderCentrality(centralityData);
+    renderBFS(bfsData);
+    animatePath(parsePath(djkData));
+  })
+  .catch(console.error);
+}
+
+// ── CANVAS GRAPH ─────────────────────────────────────────────
+
+const canvas = document.getElementById('graphCanvas');
+const ctx    = canvas.getContext('2d');
+let positions = {};
+let animStep  = -1;
+let animTimer = null;
+
+function computePositions(W, H) {
+  const layers = {
+    0: ['Desire'],
+    1: ['Sleep', 'Nutrition', 'Consistency'],
+    2: ['Strength Training', '5K Pace Reps', 'Strides', 'Threshold Intervals', 'Tempo Runs', 'Zone 2 Running'],
+    3: ['Threshold', 'VO2 Max', 'Running Economy'],
+    4: [EVENT_NAME],
+  };
+  const yRatios = [0.07, 0.24, 0.50, 0.76, 0.93];
+  const pos = {};
+  Object.entries(layers).forEach(([li, nodes]) => {
+    const y = H * yRatios[parseInt(li)];
+    nodes.forEach((name, i) => {
+      pos[name] = { x: W * (i + 1) / (nodes.length + 1), y };
+    });
+  });
+  return pos;
+}
+
+function setupCanvas() {
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W    = rect.width - 32;  // 1rem padding each side
+  const H    = 520;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  positions = computePositions(W, H);
+}
+
+function parsePath(data) {
+  return data.map(s => {
+    const m = s.match(/^(.+?)\s*\(\d+\)$/);
+    return m ? m[1] : s;
+  }).filter(n => n !== 'new level');
+}
+
+function edgeInPath(v1, v2, pathNames, upToStep) {
+  for (let i = 0; i < Math.min(pathNames.length - 1, upToStep); i++) {
+    if ((pathNames[i] === v1 && pathNames[i+1] === v2) ||
+        (pathNames[i] === v2 && pathNames[i+1] === v1)) return true;
+  }
+  return false;
+}
+
+function drawGraph(pathStep) {
+  if (!positions || !Object.keys(positions).length) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = canvas.width  / dpr;
+  const H    = canvas.height / dpr;
+  const step = (pathStep !== undefined) ? pathStep : (animStep >= 0 ? animStep : 9999);
+  const pathNames = parsePath(djkData);
+  const pathSet   = new Set(pathNames);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // draw grid lines for layer separation (subtle)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  [0.24, 0.50, 0.76].forEach(r => {
+    ctx.beginPath();
+    ctx.moveTo(0, H * r - 0.5); ctx.lineTo(W, H * r - 0.5);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // Build full edge list
+  const edges = [...BASE_EDGES, ...(EVENT_EDGE_MAP[EVENT_NAME] || [])];
+
+  // ── DRAW EDGES ──
+  edges.forEach(([v1, v2, weight]) => {
+    const p1 = positions[v1], p2 = positions[v2];
+    if (!p1 || !p2) return;
+
+    const inPath = edgeInPath(v1, v2, pathNames, step);
+    const thickness = Math.max(0.4, (100 - weight) / 20);
+
+    ctx.save();
+    if (inPath) {
+      ctx.strokeStyle = '#39ff14';
+      ctx.lineWidth   = 2.5;
+      ctx.shadowColor = '#39ff14';
+      ctx.shadowBlur  = 14;
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.lineWidth   = thickness * 0.6;
+      ctx.globalAlpha = 0.6;
+    }
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // ── DRAW NODES ──
+  const R = 18;
+  Object.entries(positions).forEach(([name, pos]) => {
+    const layer   = (name === EVENT_NAME) ? 4 : (NODE_LAYERS[name] !== undefined ? NODE_LAYERS[name] : 4);
+    const color   = NODE_COLORS[layer] || '#888';
+    const inPath  = pathSet.has(name);
+    const str     = getStrength(name) / 100;
+    const label   = CANVAS_LABELS[name] || name;
+
+    ctx.save();
+
+    // glow for path nodes
+    if (inPath && step > 0) {
+      ctx.shadowColor = '#39ff14';
+      ctx.shadowBlur  = 20;
+    }
+
+    // node fill — strength fill from bottom
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, R, 0, Math.PI * 2);
+    ctx.fillStyle = inPath ? 'rgba(57,255,20,0.18)' : `${color}22`;
+    ctx.fill();
+
+    // strength arc (filled arc from bottom clockwise)
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.arc(pos.x, pos.y, R - 2, -Math.PI / 2, -Math.PI / 2 + str * Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = inPath ? 'rgba(57,255,20,0.25)' : `${color}30`;
+    ctx.fill();
+
+    // node border
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, R, 0, Math.PI * 2);
+    ctx.strokeStyle = inPath ? '#39ff14' : color;
+    ctx.lineWidth   = inPath ? 2 : 1;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // ── LABEL ──
+    ctx.save();
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = inPath ? 'bold 10px Segoe UI' : '10px Segoe UI';
+    ctx.fillStyle = inPath ? '#39ff14' : '#ccc';
+
+    // wrap long labels to two lines
+    const words = label.split(' ');
+    if (words.length > 1 && label.length > 10) {
+      const mid = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, mid).join(' ');
+      const line2 = words.slice(mid).join(' ');
+      ctx.fillText(line1, pos.x, pos.y + R + 4);
+      ctx.fillText(line2, pos.x, pos.y + R + 15);
+    } else {
+      ctx.fillText(label, pos.x, pos.y + R + 6);
+    }
+
+    // strength % (small, below label)
+    if (name !== 'Desire' && name !== EVENT_NAME) {
+      ctx.font = '9px Consolas';
+      ctx.fillStyle = inPath ? 'rgba(57,255,20,0.7)' : 'rgba(255,255,255,0.3)';
+      const labelY = (label.split(' ').length > 2) ? pos.y + R + 26 : pos.y + R + 18;
+      ctx.fillText(getStrength(name) + '%', pos.x, labelY);
+    }
+    ctx.restore();
+  });
+}
+
+function animatePath(pathNames) {
+  clearInterval(animTimer);
+  animStep = 0;
+  drawGraph(0);
+  animTimer = setInterval(() => {
+    animStep++;
+    drawGraph(animStep);
+    if (animStep >= pathNames.length - 1) clearInterval(animTimer);
+  }, 200);
+}
+
+// ── DIJKSTRA RENDERING ────────────────────────────────────────
+
+function renderDijkstra(data) {
+  const pathFlow  = document.getElementById('djk-path-flow');
+  const summary   = document.getElementById('djk-summary');
+  const cardsEl   = document.getElementById('djk-cards');
+  if (!pathFlow) return;
+
+  const nodes = data.map(s => {
+    const m = s.match(/^(.+?)\s*\((\d+)\)$/);
+    return m ? { name: m[1], strength: parseInt(m[2]) } : { name: s, strength: 100 };
+  }).filter(n => n.name !== 'new level');
+
+  // ── PATH FLOW VISUALIZATION ──
+  pathFlow.innerHTML = '';
+  nodes.forEach((node, i) => {
+    const isFirst = i === 0;
+    const isLast  = i === nodes.length - 1;
+    const boxClass = isFirst ? 'path-box origin' : isLast ? 'path-box goal' : 'path-box';
+    const layerIdx = (node.name === EVENT_NAME) ? 4 : (NODE_LAYERS[node.name] !== undefined ? NODE_LAYERS[node.name] : '?');
+    const layerName = LAYER_NAMES[layerIdx] || '';
+
+    const div = document.createElement('div');
+    div.className = 'path-node';
+    div.innerHTML =
+      `<div class="${boxClass}">${DISPLAY_NAMES[node.name] || node.name}</div>` +
+      `<span class="path-str">${isFirst || isLast ? layerName : node.strength + '%'}</span>`;
+    pathFlow.appendChild(div);
+
+    if (!isLast) {
+      const arr = document.createElement('div');
+      arr.className = 'path-arrow'; arr.textContent = '→';
+      pathFlow.appendChild(arr);
+    }
+  });
+
+  // ── PLAIN-ENGLISH SUMMARY ──
+  if (nodes.length >= 3) {
+    const bottleneck = nodes.find(n => NODE_LAYERS[n.name] === 2);
+    const physio     = nodes.find(n => NODE_LAYERS[n.name] === 3);
+    const foundation = nodes.find(n => NODE_LAYERS[n.name] === 1);
+    let msg = '';
+    if (foundation && bottleneck && physio) {
+      const fName = DISPLAY_NAMES[foundation.name] || foundation.name;
+      const tName = DISPLAY_NAMES[bottleneck.name] || bottleneck.name;
+      const pName = DISPLAY_NAMES[physio.name]     || physio.name;
+      msg = `<strong style="color:var(--white)">Recommendation:</strong> Strengthen <span class="text-green">${fName}</span> to better support <span class="text-green">${tName}</span>, which has the highest impact on your <span class="text-green">${pName}</span> — your current physiological bottleneck for the ${EVENT_NAME}.`;
+    } else {
+      msg = `The graph routed through <strong style="color:var(--white)">${nodes.length - 2}</strong> intermediate nodes to find the highest-leverage path to your ${EVENT_NAME} performance.`;
+    }
+    summary.innerHTML = `<div class="card card-g" style="font-size:0.88rem;margin-bottom:1rem;">${msg}</div>`;
+  } else {
+    summary.innerHTML = '';
+  }
+
+  // ── STEP CARDS ──
+  cardsEl.innerHTML = '';
+  nodes.forEach((node, i) => {
+    if (i === 0 || i === nodes.length - 1) return; // skip Desire and event
+    const card = document.createElement('div');
+    card.className = 'djk-card fade-up';
+    card.style.animationDelay = (i * 0.07) + 's';
+    const layerIdx  = NODE_LAYERS[node.name] !== undefined ? NODE_LAYERS[node.name] : '?';
+    const layerName = LAYER_NAMES[layerIdx] || '';
+    const desc      = NODE_DESCRIPTIONS[node.name] || '';
+    card.innerHTML =
+      `<div class="djk-step">Step ${i} · ${layerName}</div>` +
+      `<h4>${DISPLAY_NAMES[node.name] || node.name} <span style="color:var(--muted);font-weight:400;font-size:0.8rem;">${node.strength}%</span></h4>` +
+      `<p>${desc}</p>`;
+    cardsEl.appendChild(card);
+  });
+}
+
+// ── CENTRALITY RENDERING ──────────────────────────────────────
+
+// Static degree lookup (undirected, from the graph structure)
+const STATIC_DEGREE = {
+  'Desire':3, 'Sleep':7, 'Nutrition':7, 'Consistency':7,
+  'Strength Training':6, '5K Pace Reps':6, 'Strides':6,
+  'Threshold Intervals':6, 'Tempo Runs':6, 'Zone 2 Running':6,
+  'Threshold':7, 'VO2 Max':7, 'Running Economy':7,
+};
+
+function renderCentrality(data) {
+  const el = document.getElementById('cent-chart');
+  if (!el) return;
+  el.innerHTML = '';
+
+  // Parse name+strength from centralityData strings, compute live scores
+  const scores = data.map((s, rank) => {
+    const m = s.match(/^(.+?)\s*\((\d+)\)$/);
+    const name     = m ? m[1] : s;
+    const strength = m ? parseInt(m[2]) : getStrength(name);
+    const degree   = STATIC_DEGREE[name] || 1;
+    const score    = degree * (strength / 100);
+    return { name, strength, degree, score, rank: rank + 1 };
+  });
+
+  const maxScore = Math.max(...scores.map(s => s.score), 1);
+
+  scores.forEach(item => {
+    const layer = NODE_LAYERS[item.name];
+    const color = (layer === 1) ? '#facc15' : (layer === 3) ? '#44aaff' : (layer === 2) ? '#888' : '#ff6a00';
+    const pct   = (item.score / maxScore * 100).toFixed(0);
+    const row   = document.createElement('div');
+    row.className = 'cent-row';
+    row.innerHTML =
+      `<span class="cent-rank">#${item.rank}</span>` +
+      `<span class="cent-name" style="color:${item.rank <= 3 ? 'var(--white)' : 'var(--muted)'}">${DISPLAY_NAMES[item.name] || item.name}</span>` +
+      `<div class="cent-track"><div class="cent-fill" style="width:0%;background:${color};box-shadow:0 0 6px ${color}40;"></div></div>` +
+      `<span class="cent-score">${item.score.toFixed(1)}</span>`;
+    el.appendChild(row);
+    // Animate bar after a tick
+    setTimeout(() => {
+      const fill = row.querySelector('.cent-fill');
+      if (fill) fill.style.width = pct + '%';
+    }, 60 + item.rank * 40);
+  });
+}
+
+// ── BFS RENDERING ─────────────────────────────────────────────
+
+function renderBFS(data) {
+  const el = document.getElementById('bfs-display');
+  if (!el) return;
+  el.innerHTML = '';
+
+  // Split data into levels at "new level" markers
+  const levels = [[]];
+  data.forEach(s => {
+    if (s === 'new level') {
+      levels.push([]);
+    } else {
+      levels[levels.length - 1].push(s);
+    }
+  });
+
+  levels.filter(l => l.length > 0).forEach((level, li) => {
+    const div = document.createElement('div');
+    div.className = 'bfs-level';
+
+    const nodesHtml = level.map(s => {
+      const m    = s.match(/^(.+?)\s*\((\d+)\)$/);
+      const name = m ? m[1] : s;
+      const str  = m ? parseInt(m[2]) : 100;
+      const layer = (name === EVENT_NAME) ? 4 : (NODE_LAYERS[name] !== undefined ? NODE_LAYERS[name] : 4);
+      const color = NODE_COLORS[layer] || '#888';
+      return `<span class="bfs-node" style="border-color:${color}40;color:${color};">${DISPLAY_NAMES[name] || name} <span style="opacity:0.55;font-size:0.72rem;font-family:var(--mono);">${str}%</span></span>`;
+    }).join('');
+
+    div.innerHTML =
+      `<div class="bfs-level-header">Level ${li} — ${LAYER_NAMES[li] || 'Nodes'}</div>` +
+      `<div class="bfs-nodes">${nodesHtml}</div>`;
+    el.appendChild(div);
+
+    // Staggered appearance animation
+    setTimeout(() => div.classList.add('show'), 80 + li * 140);
+  });
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  // Re-trigger centrality bar animations when that tab opens
+  if (tab === 'cent') {
+    document.querySelectorAll('.cent-fill').forEach((f, i) => {
+      const w = f.style.width;
+      f.style.width = '0%';
+      setTimeout(() => { f.style.width = w; }, 60 + i * 40);
+    });
+  }
+  if (tab === 'bfs') {
+    document.querySelectorAll('.bfs-level').forEach((l, i) => {
+      l.classList.remove('show');
+      setTimeout(() => l.classList.add('show'), 80 + i * 140);
+    });
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+
+window.addEventListener('load', () => {
+  buildControls();
+  setupCanvas();
+  drawGraph();
+  renderDijkstra(djkData);
+  renderCentrality(centralityData);
+  renderBFS(bfsData);
+  setTimeout(() => animatePath(parsePath(djkData)), 300);
+});
+
+window.addEventListener('resize', () => {
+  setupCanvas();
+  drawGraph();
+});
+</script>
+
+{% endblock %}

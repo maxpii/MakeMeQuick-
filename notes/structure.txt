@@ -1,0 +1,37 @@
+This text document outlines the structure that my graph will employ. It is a simplified version of running peformance, but considering the time-frame, encapsulates some of the core principles of improving as a distance runner.
+
+General structure:
+FOUNDATIONAL FACTORS
+        ↓
+TRAINING METHODS
+        ↓
+PHYSIOLOGICAL SYSTEMS
+        ↓
+EVENT PERFORMANCE
+
+
+Foundational Factors-build the basis for everything else:
+Sleep
+Nutrition
+Consistency
+
+
+Training Methods-the actions that one does to improve:
+Strength Training
+5K Pace Reps
+Strides
+Threshold Intervals
+Tempo Runs
+Zone 2 Running
+
+Physiological Systems-The biological systems that the training methods improve which contribute to performance:
+VO2 Max
+Lactate Threshold
+Running Economy
+
+Events (different graphs for each one with different corresponding weights):
+800m
+1600m
+3200m
+// might add more later. Note that all these events, despite being shorter, still have a large aerobic component, which is part of the reason my model can be generalized for them despite lacking other factors 
+

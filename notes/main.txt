@@ -1,0 +1,16 @@
+The goal of this project is to give atheltes a way to visualize which factors they need to improve the most in specific distance events. I will be using graphs and graphing algorithms to visually illustrate how different metrics can be used to improve performance in specific events.
+
+Using two sources to set up the basis of the logic in my application.
+
+Article: https://shuichi-running.com/en/vo2max-lactate-threshold-running-economy/
+Youtube Video: https://www.youtube.com/watch?v=J7mna-hM5v8
+
+Note: While many of the principles mentioned in these videos are applied to longer distances, some can still be applied to shorter distance training
+
+Conversions for each event-What your performance should* be compared to other events:
+1600m = 1600m pace
+3200m pace = 1600m pace + 20s/mile
+800m pace = 1600m pace - 20s/mile
+
+
+*when looking at a general pattern for balanced atheltes. 

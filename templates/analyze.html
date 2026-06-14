@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Athlete Analysis — MakeMeQuick{% endblock %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header fade-up">
+  <p class="eyebrow">Data Analysis</p>
+  <h1 class="text-green glow-g">Athlete Analyzer</h1>
+  <p>Upload a CSV of race times to classify each athlete's relative strength profile across the 800m, 1600m, and 3200m.</p>
+  <p style="font-size:0.8rem;color:var(--muted);margin-top:0.4rem;">Expected format: <code style="font-family:var(--mono);color:var(--green);">Name, 800m time (M:SS), 1600m time (M:SS), 3200m time (M:SS)</code></p>
+</div>
+
+<!-- UPLOAD ZONE -->
+<div style="margin-bottom:2rem;">
+  <label class="upload-zone" id="dropZone" for="csvInput">
+    <div class="upload-icon">📂</div>
+    <h3>Drop your CSV file here</h3>
+    <p>or click to browse</p>
+    <p style="font-size:0.75rem;margin-top:0.5rem;color:var(--muted);">Accepts .csv files only</p>
+    <input type="file" id="csvInput" accept=".csv">
+  </label>
+  <div style="display:flex;gap:0.75rem;margin-top:1rem;align-items:center;flex-wrap:wrap;">
+    <button class="btn btn-g" onclick="triggerAnalysis()">Analyze</button>
+    <button class="btn btn-outline" onclick="clearResults()">Clear</button>
+    <span id="file-label" style="font-size:0.85rem;color:var(--muted);">No file selected</span>
+  </div>
+</div>
+
+<!-- SUMMARY STATS (hidden until results load) -->
+<div id="stats-section" style="display:none;margin-bottom:2rem;">
+  <p class="eyebrow">Summary</p>
+  <div class="grid g4" id="stats-grid"></div>
+</div>
+
+<!-- RESULTS TABLE -->
+<div id="results-section" style="display:none;">
+  <p class="eyebrow">Results</p>
+  <h2 style="margin-bottom:1rem;">Athlete Profiles</h2>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>800m</th>
+          <th>1600m</th>
+          <th>3200m</th>
+          <th>Profile</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody id="results-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const csvInput = document.getElementById('csvInput');
+
+// ── DRAG AND DROP ─────────────────────────────────────────────
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) { csvInput.files = e.dataTransfer.files; processFile(file); }
+});
+csvInput.addEventListener('change', () => {
+  if (csvInput.files[0]) processFile(csvInput.files[0]);
+});
+
+function triggerAnalysis() {
+  if (!csvInput.files[0]) {
+    dropZone.style.borderColor = 'var(--orange)';
+    setTimeout(() => { dropZone.style.borderColor = ''; }, 1500);
+    return;
+  }
+  processFile(csvInput.files[0]);
+}
+
+function clearResults() {
+  document.getElementById('results-tbody').innerHTML = '';
+  document.getElementById('stats-grid').innerHTML = '';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('stats-section').style.display = 'none';
+  document.getElementById('file-label').textContent = 'No file selected';
+  csvInput.value = '';
+}
+
+// ── FILE PROCESSING ───────────────────────────────────────────
+
+function processFile(file) {
+  document.getElementById('file-label').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file);
+}
+
+function convertToSeconds(timeStr) {
+  if (!timeStr) return NaN;
+  const trimmed = timeStr.trim();
+  const parts = trimmed.split(':');
+  if (parts.length !== 2) return NaN;
+  return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+}
+
+function fmtTime(secs) {
+  if (isNaN(secs)) return '–';
+  const m = Math.floor(secs / 60);
+  const s = (secs % 60).toFixed(1).padStart(4, '0');
+  return `${m}:${s}`;
+}
+
+function classifyAthlete(time8, time16, time32) {
+  const diff8  = ((time16 - 20) / 2) - time8;
+  const diff32 = ((time16 + 20) * 2) - time32;
+
+  if (isNaN(diff8) || isNaN(diff32)) return { label: 'Incomplete Data', cls: 'result-o', rec: 'Check time format (M:SS).' };
+
+  if (diff8 > 0 && diff32 > 0)
+    return { label: 'Weaker 1600m',    cls: 'result-o', rec: 'The mile is the limiting event. Focus on threshold intervals and tempo work.' };
+  if (diff8 < 0 && diff32 > 0)
+    return { label: 'Weaker 800m',     cls: 'result-o', rec: 'Speed and explosive power need work. Add strides, 5K pace reps, and strength training.' };
+  if (diff8 > 0 && diff32 < 0)
+    return { label: 'Weaker 3200m',    cls: 'result-o', rec: 'Aerobic base is the limiter. Increase zone 2 volume and threshold work.' };
+  return { label: 'Balanced Runner',  cls: 'result-g', rec: 'Even strength across distances. Focus on overall training quality and consistency.' };
+}
+
+function parseCSV(text) {
+  const rows = text.trim().split(/\r?\n/);
+
+  const athletes = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cols  = rows[i].split(',');
+    if (cols.length < 4) continue;
+    const name  = cols[0].trim();
+    const t8    = convertToSeconds(cols[1]);
+    const t16   = convertToSeconds(cols[2]);
+    const t32   = convertToSeconds(cols[3]);
+    const {label, cls, rec} = classifyAthlete(t8, t16, t32);
+    athletes.push({ name, t8, t16, t32, label, cls, rec });
+  }
+
+  renderResults(athletes);
+}
+
+function renderResults(athletes) {
+  if (!athletes.length) return;
+
+  // ── SUMMARY STATS ──
+  const counts = { 'Balanced Runner': 0, 'Weaker 1600m': 0, 'Weaker 800m': 0, 'Weaker 3200m': 0, 'Incomplete Data': 0 };
+  athletes.forEach(a => { if (counts[a.label] !== undefined) counts[a.label]++; });
+
+  const statsGrid = document.getElementById('stats-grid');
+  statsGrid.innerHTML = '';
+  [
+    { key: 'Balanced Runner', label: 'Balanced', color: 'var(--green)' },
+    { key: 'Weaker 800m',     label: 'Weaker 800m', color: 'var(--orange)' },
+    { key: 'Weaker 1600m',    label: 'Weaker 1600m', color: 'var(--orange)' },
+    { key: 'Weaker 3200m',    label: 'Weaker 3200m', color: 'var(--orange)' },
+  ].forEach(({ key, label, color }) => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.innerHTML =
+      `<div class="stat-num" style="color:${color};">${counts[key]}</div>` +
+      `<div class="stat-label">${label}</div>`;
+    statsGrid.appendChild(card);
+  });
+  document.getElementById('stats-section').style.display = 'block';
+
+  // ── TABLE ROWS ──
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = '';
+  athletes.forEach((a, i) => {
+    const tr = document.createElement('tr');
+    tr.style.animationDelay = (i * 0.04) + 's';
+    tr.className = 'fade-up';
+    tr.innerHTML =
+      `<td><strong>${a.name}</strong></td>` +
+      `<td style="font-family:var(--mono);">${fmtTime(a.t8)}</td>` +
+      `<td style="font-family:var(--mono);">${fmtTime(a.t16)}</td>` +
+      `<td style="font-family:var(--mono);">${fmtTime(a.t32)}</td>` +
+      `<td class="result-cell ${a.cls}">${a.label}</td>` +
+      `<td style="font-size:0.82rem;color:var(--muted);">${a.rec}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+
+{% endblock %}

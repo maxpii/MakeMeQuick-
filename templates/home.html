@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}MakeMeQuick — Running Performance Optimization{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<div class="hero fade-up">
+  <p class="eyebrow">Running Performance Optimization</p>
+  <h1>Get <span class="text-green glow-g">Fast.</span><br>Get There Smarter.</h1>
+  <p>Graph-powered training recommendations for the 800m, 1600m, and 3200m. Built on Dijkstra's algorithm, BFS, and degree centrality applied to real athletic training dependencies.</p>
+  <div class="hero-btns">
+    <a href="/p16" class="btn btn-g">Optimize Your Mile</a>
+    <a href="/analyze" class="btn btn-outline">Analyze Athletes</a>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- EVENT CARDS -->
+<div style="margin-bottom:3rem;">
+  <p class="eyebrow">Choose Your Race</p>
+  <h2 style="margin-bottom:0.4rem;">Pick Your Distance</h2>
+  <p class="section-desc">Each race has unique physiological demands. Select your event to see a personalized training graph with algorithmic recommendations.</p>
+  <div class="grid g3">
+
+    <a href="/p8" class="event-card ev-o">
+      <div class="event-num text-orange">800<span class="event-unit">m</span></div>
+      <h3>Sprint Endurance</h3>
+      <p>High lactate tolerance, explosive power, and top-end VO2 max. The shortest and most intense middle-distance race.</p>
+      <div class="event-tags">
+        <span class="badge badge-o">Speed</span>
+        <span class="badge badge-dim">2 Laps</span>
+        <span class="badge badge-dim">~2 min</span>
+      </div>
+    </a>
+
+    <a href="/p16" class="event-card ev-g">
+      <div class="event-num text-green">1600<span class="event-unit">m</span></div>
+      <h3>The Mile</h3>
+      <p>Perfectly balanced aerobic and anaerobic demands. The definitive test of all-around middle-distance fitness.</p>
+      <div class="event-tags">
+        <span class="badge badge-g">Balanced</span>
+        <span class="badge badge-dim">4 Laps</span>
+        <span class="badge badge-dim">~4–5 min</span>
+      </div>
+    </a>
+
+    <a href="/p32" class="event-card ev-o">
+      <div class="event-num text-orange">3200<span class="event-unit">m</span></div>
+      <h3>Distance Race</h3>
+      <p>Aerobic threshold dominates. Running economy and sustained output over 8 laps define the winner.</p>
+      <div class="event-tags">
+        <span class="badge badge-o">Endurance</span>
+        <span class="badge badge-dim">8 Laps</span>
+        <span class="badge badge-dim">~9–11 min</span>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ALGORITHM OVERVIEW -->
+<div style="margin-bottom:3rem;">
+  <p class="eyebrow">Under the Hood</p>
+  <h2 style="margin-bottom:0.4rem;">Powered by Graph Algorithms</h2>
+  <p class="section-desc">Every recommendation is derived from classical graph theory applied to a real athletic training dependency network.</p>
+  <div class="grid g3">
+
+    <div class="algo-card">
+      <div class="algo-icon">⚡</div>
+      <h3 class="text-green">Dijkstra's Algorithm</h3>
+      <p>Finds the lowest-cost path from <em>Desire</em> to your goal event. Edge cost = weight × (node strength ÷ 100). Low strength means more room to improve — Dijkstra routes through the highest-leverage weaknesses.</p>
+    </div>
+
+    <div class="algo-card">
+      <div class="algo-icon">🌐</div>
+      <h3 class="text-orange">BFS Traversal</h3>
+      <p>Explores the full training graph level by level from Desire. Shows every training factor in dependency order — foundational habits first, race performance last.</p>
+    </div>
+
+    <div class="algo-card">
+      <div class="algo-icon">📊</div>
+      <h3 class="text-green">Degree Centrality</h3>
+      <p>Ranks nodes by their number of connections scaled by current strength. High-centrality factors like Sleep and Consistency are load-bearing across every pathway in the graph.</p>
+    </div>
+
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- GRAPH STRUCTURE OVERVIEW -->
+<div style="margin-bottom:3rem;">
+  <p class="eyebrow">Training Network</p>
+  <h2 style="margin-bottom:0.4rem;">The Performance Graph</h2>
+  <p class="section-desc">Five layers connect motivation to race performance. Rate each node 10–100 to reflect your current training status — the algorithms adapt in real time.</p>
+
+  <div class="card" style="padding:2rem;">
+    <div class="layer-visual">
+
+      <div class="layer-row">
+        <div class="layer-title">Layer 0 — Origin</div>
+        <div class="layer-nodes">
+          <span class="badge badge-o" style="font-size:0.85rem;padding:0.35rem 1.1rem;">Desire</span>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+
+      <div class="layer-row">
+        <div class="layer-title">Layer 1 — Foundations</div>
+        <div class="layer-nodes">
+          <span class="badge badge-g">Sleep</span>
+          <span class="badge badge-g">Nutrition</span>
+          <span class="badge badge-g">Consistency</span>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+
+      <div class="layer-row">
+        <div class="layer-title">Layer 2 — Training Methods</div>
+        <div class="layer-nodes">
+          <span class="badge badge-dim">Strength Training</span>
+          <span class="badge badge-dim">5K Pace Reps</span>
+          <span class="badge badge-dim">Strides</span>
+          <span class="badge badge-dim">Threshold Intervals</span>
+          <span class="badge badge-dim">Tempo Runs</span>
+          <span class="badge badge-dim">Zone 2 Running</span>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+
+      <div class="layer-row">
+        <div class="layer-title">Layer 3 — Physiology</div>
+        <div class="layer-nodes">
+          <span class="badge badge-o">Lactate Threshold</span>
+          <span class="badge badge-o">VO2 Max</span>
+          <span class="badge badge-o">Running Economy</span>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+
+      <div class="layer-row">
+        <div class="layer-title">Layer 4 — Race Performance</div>
+        <div class="layer-nodes">
+          <span class="badge badge-g" style="font-size:0.85rem;padding:0.35rem 1.1rem;">800m / 1600m / 3200m</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ANALYZE CTA 
+<div style="margin-bottom:2rem;">
+  <div class="card card-g" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div>
+      <h3>Athlete CSV Analysis</h3>
+      <p style="font-size:0.88rem;color:var(--muted);margin-top:0.2rem;">Upload a CSV of race times to classify each athlete's relative strengths across the 800m, 1600m, and 3200m.</p>
+    </div>
+    <a href="/analyze" class="btn btn-g">Open Analyzer →</a>
+  </div>
+</div>
+-->
+
+{% endblock %}
